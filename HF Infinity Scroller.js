@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         HF Infinity Scroller
-// @version      0.0.1
+// @version      0.0.2
 // @description  This script dynamically adds content. It lets you scroll threads without having to load the next page manually, like facebook or instagram.
 // @author       Pylon
 // @match        https://hackforums.net/showthread.php?tid=*
@@ -33,7 +33,7 @@ function wrapFixedBar(){
   return $('.quick_keys').children().filter(function(){
     if (flag){
       return;
-    } else if (this.id == 'posts'){;
+    } else if (this.id == 'posts'){
       flag = true;
       return;
     }
@@ -47,34 +47,20 @@ function Pages(){
   if (this.success){
     currentPage.attr('href', window.location.href).replaceTag('a');
     this.page = parseInt(currentPage.get(0).innerText);
-    this.end  = parseInt($('.pagination_next').prev().get(0).innerText);
+    $next = $('.pagination_next');
+    if ($next){
+      this.end  = parseInt($next.prev().get(0).innerText);
+    }else{
+      this.end = this.page;
+    }
     this.base = window.location.href.split('&page')[0];
-    $guide = $('.pagination').html(''); // remove the html
-    $guide.append(`<span><b>Pages (${this.end}): </b></span>`);
-    if (this.page != 1){
-        $guide.append(`<a href="${this.base+'&page='+(this.page-1)}" class="pagination_previous" style="margin-right: 5px;">« Previous</a>`);
-    }
-    if (1){
-      for (var i = 1; i < this.end+1; i++){ // look at this, show the 7th page not the sixth
-          if (i > 5 && this.end != 6){
-             $guide.append(`<span id="spacer1"><b>... </b></span"><div class="middle_ground" style="display: none;"><a href="#" class="pagination_page" style="margin-right: 5px;">0</a></div><span id="spacer2" style="display:none"><b>... </b></span>`);
-             $guide.append(`<a href="${this.base+'&page='+this.end}" class="${(i==this.end) ? 'pagination_current':'pagination_page'}" style="margin-right: 5px;">${this.end}</a>`);
-             break;
-          }
-        $guide.append(`<a href="${this.base+'&page='+i}" class="${(i==this.page) ? 'pagination_current':'pagination_page'}" style="margin-right: 5px;">${i}</a>`);
-      }
-    }
-    if (this.end != this.page){
-        $guide.append(`<a href="${this.base+'&page='+(this.page+1)}" class="pagination_next">Next »</a>`);
-    }
+    this.$guide = $('.pagination').attr('id', 'undynamic_bar');//.html(''); // remove the html
+    this.$bar = this.$guide.first().after(`<div class="pagination" style="display:none;" id="dynamic_bar"><span><b>Pages (${this.end}): </b></span><a href="#${$('#posts a').get(0).id}" class="pagination_previous" style="margin-right: 5px;">Back to Top</a><a href="#" id="youarehere" class="pagination_current" style="margin-right: 5px;">1</a></div>`).siblings('#dynamic_bar');
+    this.$pos = $("#youarehere");
     this.canContinue = this.page < this.end;
     this.beingUsed = false;
     this.next = function(){
       this.canContinue = ++this.page < this.end;
-      $('.pagination_current').attr('class', 'pagination_page').next().attr('class', 'pagination_current');
-      //if (this.page >){
-
-      //}
       return this.base+'&page='+this.page;
     };
     this.isNext = function(){
@@ -88,13 +74,25 @@ if (Page.success){
    fixedBar = wrapFixedBar();
    fixedBarY = (fixedBar.position().top + 1);
    posts = $("table[id^=post]");
+   $("#posts").append(`<a class="whereami" page="${Page.page}"></a>`);
    lastPost = posts.get(-2);
   $(window).scroll(function() {
+    // Handels what page the user is looking at right now. <Adapted from: James Montagne @ https://stackoverflow.com/questions/6848269/using-jquery-to-find-current-visible-element-and-update-navigation > 
+    $('a.whereami').each(function(){
+        if($(this).offset().top > 0){
+            Page.$pos.text($(this).attr('page')).attr('href', Page.base+'&page'+$(this).attr('page'));
+            return false; // stops the iteration after the first one on screen
+        }
+    });
     // Fixed Header Handler
     if (window.scrollY > fixedBarY) {
+      Page.$guide.hide();
+      Page.$bar.show();
       fixedBar.width(posts.width()+3);
       fixedBar.css({position: 'fixed', top: '0px', background: '#333333'});
     } else {
+      Page.$bar.hide();
+      Page.$guide.show();
       fixedBar.width('inherit');
       fixedBar.css({position: 'relative', background: 'none'});
     }
@@ -104,8 +102,10 @@ if (Page.success){
       try {
         $.ajax(Page.next()).done(function(html){
           try {
+            console.log(Page.page);
             $('#posts').append($(DOMify(html)).find('#posts').children());
           } catch(e) {console.log(e);}
+          $("#posts").append(`<a class="whereami" page="${Page.page}"></a>`);
           lastPost = $("table[id^=post]").get(-2);
           Page.beingUsed = false;
         });
